@@ -114,7 +114,7 @@ module Docopt
     # Parse command line arguments using docopt without defaults
     args = Docopt.docopt(doc_without_defaults, argv: argv, help: help, version: version, options_first: options_first)
 
-    # Parse original docopt to extract defaults using docopt's built-in functionality
+    # Extract defaults using docopt's built-in functionality
     docopt_defaults = extract_docopt_defaults_using_docopt(doc)
 
     # Parse config file if provided
