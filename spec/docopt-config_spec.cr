@@ -205,8 +205,8 @@ Options:
 DOC
 
       options = Docopt.docopt_config(doc, argv: [] of String)
-      options["--simple"].should be_nil  # No default
-      options["--verbose"].should eq("mixed-default")  # Has default
+      options["--simple"].should be_nil               # No default
+      options["--verbose"].should eq("mixed-default") # Has default
     end
 
     it "implements correct precedence: CLI > env vars > config file > docopt defaults" do

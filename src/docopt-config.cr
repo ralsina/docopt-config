@@ -29,15 +29,15 @@ module Docopt
         if config.has_key?(key)
           value = config[key]
           return case value.raw
-                 when String
-                   value.as_s
-                 when Bool
-                   value.as_bool
-                 when Int64
-                   value.as_i.to_i32
-                 else
-                   value.to_s
-                 end
+          when String
+            value.as_s
+          when Bool
+            value.as_bool
+          when Int64
+            value.as_i.to_i32
+          else
+            value.to_s
+          end
         end
 
         # Then try clean key match (for unquoted keys like "verbose" or "input_file")
@@ -45,15 +45,15 @@ module Docopt
         if config.has_key?(clean_key)
           value = config[clean_key]
           return case value.raw
-                 when String
-                   value.as_s
-                 when Bool
-                   value.as_bool
-                 when Int64
-                   value.as_i.to_i32
-                 else
-                   value.to_s
-                 end
+          when String
+            value.as_s
+          when Bool
+            value.as_bool
+          when Int64
+            value.as_i.to_i32
+          else
+            value.to_s
+          end
         end
 
         # Finally try snake_case key (for "input_file" matching "--input-file")
@@ -61,15 +61,15 @@ module Docopt
         if config.has_key?(snake_key)
           value = config[snake_key]
           return case value.raw
-                 when String
-                   value.as_s
-                 when Bool
-                   value.as_bool
-                 when Int64
-                   value.as_i.to_i32
-                 else
-                   value.to_s
-                 end
+          when String
+            value.as_s
+          when Bool
+            value.as_bool
+          when Int64
+            value.as_i.to_i32
+          else
+            value.to_s
+          end
         end
       end
 
@@ -90,7 +90,11 @@ module Docopt
     def has_key?(key : String) : Bool
       @args.has_key?(key) ||
         @env_vars.has_key?(key) ||
-        (@config_file && @config_file.not_nil!.has_key?(key))
+        (if config = @config_file
+           config.has_key?(key)
+         else
+           false
+         end)
     end
   end
 
@@ -101,15 +105,25 @@ module Docopt
 
   # Main function to parse docopt with config file and environment variable support
   def self.docopt_config(doc : String,
-                   argv : Array(String) = ARGV,
-                   config_file_path : String? = nil,
-                   env_prefix : String? = nil,
-                   help : Bool = true,
-                   version : String? = nil,
-                   options_first : Bool = false) : ConfigOptions
-
+                         argv : Array(String) = ARGV,
+                         config_file_path : String? = nil,
+                         env_prefix : String? = nil,
+                         help : Bool = true,
+                         version : String? = nil,
+                         options_first : Bool = false) : ConfigOptions
     # Store original docopt for help display
     original_doc = doc
+
+    # Early detection for help and version requests
+    if help && (argv.includes?("--help") || argv.includes?("-h"))
+      puts original_doc
+      Process.exit(0)
+    end
+
+    if version && argv.includes?("--version")
+      puts version
+      Process.exit(0)
+    end
 
     # Create a modified docopt string without defaults for parsing
     doc_without_defaults = remove_docopt_defaults(doc)
@@ -119,8 +133,8 @@ module Docopt
       args = Docopt.docopt(
         doc_without_defaults,
         argv: argv,
-        help: help,
-        version: version,
+        help: false,  # Disable help since we handle it above
+        version: nil, # Disable version since we handle it above
         options_first: options_first,
         exit: false
       )
@@ -129,52 +143,51 @@ module Docopt
       docopt_defaults = extract_docopt_defaults_using_docopt(doc)
 
       # Parse config file if provided
-    config_file : Hash(String, YAML::Any)? = nil
-    if config_file_path && File.exists?(config_file_path)
-      begin
-        config_content = File.read(config_file_path)
-        yaml_data = YAML.parse(config_content).as_h
-        # Convert YAML keys to strings
-        stringified_config = Hash(String, YAML::Any).new
-        yaml_data.each do |key, value|
-          stringified_config[key.as_s] = value
+      config_file : Hash(String, YAML::Any)? = nil
+      if config_file_path && File.exists?(config_file_path)
+        begin
+          config_content = File.read(config_file_path)
+          yaml_data = YAML.parse(config_content).as_h
+          # Convert YAML keys to strings
+          stringified_config = Hash(String, YAML::Any).new
+          yaml_data.each do |key, value|
+            stringified_config[key.as_s] = value
+          end
+          config_file = stringified_config
+        rescue ex
+          # If config file parsing fails, continue without it
+          config_file = nil
         end
-        config_file = stringified_config
-      rescue ex
-        # If config file parsing fails, continue without it
-        config_file = nil
       end
-    end
 
-    # Get relevant environment variables
-    env_vars = Hash(String, String).new
-    ENV.each do |key, value|
-      # If env_prefix is provided, only include vars with that prefix
-      if env_prefix
-        if key.starts_with?(env_prefix + "_")
-          # Remove prefix and convert to config key format
-          env_part = key[env_prefix.size + 1..-1]
-          config_key = env_to_key(env_part)
+      # Get relevant environment variables
+      env_vars = Hash(String, String).new
+      ENV.each do |key, value|
+        # If env_prefix is provided, only include vars with that prefix
+        if env_prefix
+          if key.starts_with?(env_prefix + "_")
+            # Remove prefix and convert to config key format
+            env_part = key[env_prefix.size + 1..-1]
+            config_key = env_to_key(env_part)
+            env_vars[config_key] = value
+          end
+        else
+          # Include all environment variables, convert to config key format
+          config_key = env_to_key(key)
           env_vars[config_key] = value
         end
-      else
-        # Include all environment variables, convert to config key format
-        config_key = env_to_key(key)
-        env_vars[config_key] = value
       end
+
+      ConfigOptions.new(args, docopt_defaults, config_file, env_vars)
+    rescue DocoptExit
+      # Show help with original docopt (complete with defaults)
+      puts original_doc
+      Process.exit(0)
+    rescue ex
+      # Handle other exceptions
+      puts "Error: #{ex.message}"
+      Process.exit(1)
     end
-
-    ConfigOptions.new(args, docopt_defaults, config_file, env_vars)
-
-  rescue DocoptExit
-    # Show help with original docopt (complete with defaults)
-    puts original_doc
-    Process.exit(0)
-  rescue ex
-    # Handle other exceptions
-    puts "Error: #{ex.message}"
-    Process.exit(1)
-  end
   end
 
   # Remove default specifications from docopt string
@@ -217,9 +230,9 @@ module Docopt
     when /^\d+$/
       value.to_i32
     when /^\d+\.\d+$/
-      value.to_f.to_i32  # Convert to int32 to match expected type
+      value.to_f.to_i32 # Convert to int32 to match expected type
     when /^".*"$/, /^'.*'$/
-      value[1..-2]  # Remove quotes
+      value[1..-2] # Remove quotes
     else
       value
     end
