@@ -165,8 +165,8 @@ module Docopt
   private def self.extract_docopt_defaults(doc : String) : Hash(String, (Nil | String | Int32 | Bool | Array(String)))
     defaults = Hash(String, (Nil | String | Int32 | Bool | Array(String))).new
 
-    # Find option patterns with defaults on the same line
-    doc.scan(/--([^\s=<]+)(=<[^>]+>)?.*?\[default:\s*([^\]]+)\]/) do |match|
+    # Find option patterns with defaults on the same line or multiline
+    doc.scan(/--([^\s=<]+)(=<[^>]+>)?[\s\S]*?\[default:\s*([^\]]+)\]/m) do |match|
       option_name = match[1]
       has_value = match[2] ? true : false
       default_value = match[3]

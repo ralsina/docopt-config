@@ -177,6 +177,21 @@ DOC
       end
     end
 
+    it "handles multiline option descriptions correctly" do
+      doc = <<-DOC
+Usage: test [--verbose=<level>]
+
+Options:
+  --verbose=<level>  Set the verbosity level
+                    This is a longer description
+                    that spans multiple lines
+                    [default: multiline-default]
+DOC
+
+      options = Docopt.docopt_config(doc, argv: [] of String)
+      options["--verbose"].should eq("multiline-default")
+    end
+
     it "implements correct precedence: CLI > env vars > config file > docopt defaults" do
       doc = <<-DOC
 Usage: test [--verbose=<level>]
