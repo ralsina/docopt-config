@@ -1,0 +1,9 @@
+name: docopt-config
+version: 0.1.0
+
+authors:
+  - Roberto Alsina <roberto.alsina@gmail.com>
+
+crystal: '>= 1.18.1'
+
+license: MIT
