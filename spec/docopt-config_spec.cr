@@ -83,5 +83,133 @@ describe Docopt do
         File.delete(temp_config) if File.exists?(temp_config)
       end
     end
+
+    it "handles snake_case config keys" do
+      doc = "Usage: test [--input-file=<path>]"
+      temp_config = "/tmp/test_config.yml"
+      File.write(temp_config, {"input_file" => "/path/to/file.txt"}.to_yaml)
+
+      begin
+        options = Docopt.docopt_config(doc, config_file_path: temp_config)
+        options["--input-file"].should eq("/path/to/file.txt")
+      ensure
+        File.delete(temp_config) if File.exists?(temp_config)
+      end
+    end
+
+    it "handles clean config keys without dashes" do
+      doc = "Usage: test [--verbose=<level>]"
+      temp_config = "/tmp/test_config.yml"
+      File.write(temp_config, {"verbose" => "3"}.to_yaml)
+
+      begin
+        options = Docopt.docopt_config(doc, config_file_path: temp_config)
+        options["--verbose"].should eq("3")
+      ensure
+        File.delete(temp_config) if File.exists?(temp_config)
+      end
+    end
+
+    it "handles docopt defaults when no other sources are available" do
+      doc = <<-DOC
+Usage: test [--verbose=<level>]
+
+Options:
+  --verbose=<level>  Verbosity level [default: docopt-default]
+DOC
+
+      options = Docopt.docopt_config(doc, argv: [] of String)
+      options["--verbose"].should eq("docopt-default")
+    end
+
+    it "allows environment variables to override docopt defaults" do
+      doc = <<-DOC
+Usage: test [--verbose=<level>]
+
+Options:
+  --verbose=<level>  Verbosity level [default: docopt-default]
+DOC
+
+      ENV["TEST_VERBOSE"] = "env-different-value"
+
+      begin
+        options = Docopt.docopt_config(doc, argv: [] of String, env_prefix: "TEST")
+        options["--verbose"].should eq("env-different-value")
+      ensure
+        ENV.delete("TEST_VERBOSE")
+      end
+    end
+
+    it "allows CLI arguments to take precedence even when equal to docopt default" do
+      doc = <<-DOC
+Usage: test [--verbose=<level>]
+
+Options:
+  --verbose=<level>  Verbosity level [default: same-value]
+DOC
+
+      ENV["TEST_VERBOSE"] = "different-value"
+
+      begin
+        options = Docopt.docopt_config(doc, argv: ["--verbose", "same-value"], env_prefix: "TEST")
+        options["--verbose"].should eq("same-value")
+      ensure
+        ENV.delete("TEST_VERBOSE")
+      end
+    end
+
+    it "allows config files to override docopt defaults" do
+      doc = <<-DOC
+Usage: test [--verbose=<level>]
+
+Options:
+  --verbose=<level>  Verbosity level [default: docopt-default]
+DOC
+
+      temp_config = "/tmp/test_config.yml"
+      File.write(temp_config, {"verbose" => "config-value"}.to_yaml)
+
+      begin
+        options = Docopt.docopt_config(doc, argv: [] of String, config_file_path: temp_config)
+        options["--verbose"].should eq("config-value")
+      ensure
+        File.delete(temp_config) if File.exists?(temp_config)
+      end
+    end
+
+    it "implements correct precedence: CLI > env vars > config file > docopt defaults" do
+      doc = <<-DOC
+Usage: test [--verbose=<level>]
+
+Options:
+  --verbose=<level>  Verbosity level [default: docopt-default]
+DOC
+
+      temp_config = "/tmp/test_config.yml"
+      File.write(temp_config, {"verbose" => "config-value"}.to_yaml)
+      ENV["TEST_VERBOSE"] = "env-value"
+
+      begin
+        # Test CLI > env vars > config file > docopt defaults
+        options_cli = Docopt.docopt_config(doc, argv: ["--verbose", "cli-value"], config_file_path: temp_config, env_prefix: "TEST")
+        options_cli["--verbose"].should eq("cli-value")
+
+        # Test env vars > config file > docopt defaults (no CLI)
+        options_env = Docopt.docopt_config(doc, argv: [] of String, config_file_path: temp_config, env_prefix: "TEST")
+        options_env["--verbose"].should eq("env-value")
+
+        # Test config file > docopt defaults (no CLI, no env)
+        ENV.delete("TEST_VERBOSE")
+        options_config = Docopt.docopt_config(doc, argv: [] of String, config_file_path: temp_config)
+        options_config["--verbose"].should eq("config-value")
+
+        # Test docopt defaults (no CLI, no env, no config)
+        options_default = Docopt.docopt_config(doc, argv: [] of String)
+        options_default["--verbose"].should eq("docopt-default")
+      ensure
+        File.delete(temp_config) if File.exists?(temp_config)
+        ENV.delete("TEST_VERBOSE")
+      end
+    end
   end
 end

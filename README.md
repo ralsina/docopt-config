@@ -56,12 +56,42 @@ puts options["--output"]   # Falls back to env var or config file
 
 ### Configuration File Format
 
-Create a YAML configuration file (e.g., `config.yml`):
+Create a YAML configuration file (e.g., `config.yml`) to set fallback values for your options:
 
 ```yaml
---verbose: 2
---output: "results.txt"
---force: true
+# config.yml
+verbose: 2
+output: "results.txt"
+force: true
+input_file: "/path/to/input.txt"
+count: 42
+```
+
+**Example:**
+
+For the docopt usage pattern:
+```
+Usage: myapp [--verbose=<level>] [--output=<file>] [--force] [--input-file=<path>] [--count=<number>]
+```
+
+Your configuration file would look like:
+```yaml
+# Set fallback values for all options
+verbose: "1"                      # String value (maps to --verbose)
+output: "default_output.txt"      # String with quotes (maps to --output)
+force: true                       # Boolean value (maps to --force)
+input_file: "/data/input.csv"     # Path with quotes (maps to --input-file)
+count: 10                         # Numeric value (maps to --count)
+```
+
+**Note**: The library automatically maps configuration keys to docopt options by:
+- Converting snake_case to kebab-case (`input_file` → `--input-file`)
+- Adding `--` prefix to option names (`verbose` → `--verbose`)
+
+You can also use quoted keys if you prefer:
+```yaml
+"--verbose": "1"
+"--output": "default_output.txt"
 ```
 
 ### Environment Variables
@@ -77,9 +107,13 @@ export MYAPP_FORCE=true
 ### Precedence Order
 
 The library follows this precedence order (highest to lowest):
-1. **Command-line arguments** - Always take precedence
-2. **Environment variables** - Override config file settings
-3. **Configuration file** - Provides defaults
+
+1. **Command-line arguments** - Always take precedence when provided
+2. **Environment variables** - Used when CLI argument is not provided
+3. **Configuration file** - Used when neither CLI nor env vars are available
+4. **Docopt defaults** - Used as final fallback (specified in docopt usage documentation)
+
+**Important**: The docopt documentation remains the single source of truth for option definitions. The library enhances docopt by providing additional fallback sources (environment variables and config files) that are consulted before docopt's own defaults.
 
 ### Advanced Usage
 
