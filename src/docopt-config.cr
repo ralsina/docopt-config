@@ -108,16 +108,27 @@ module Docopt
                    version : String? = nil,
                    options_first : Bool = false) : ConfigOptions
 
-    # Create a modified docopt string without defaults so we can handle them ourselves
+    # Store original docopt for help display
+    original_doc = doc
+
+    # Create a modified docopt string without defaults for parsing
     doc_without_defaults = remove_docopt_defaults(doc)
 
-    # Parse command line arguments using docopt without defaults
-    args = Docopt.docopt(doc_without_defaults, argv: argv, help: help, version: version, options_first: options_first)
+    begin
+      # Parse with exit=false to prevent automatic termination
+      args = Docopt.docopt(
+        doc_without_defaults,
+        argv: argv,
+        help: help,
+        version: version,
+        options_first: options_first,
+        exit: false
+      )
 
-    # Extract defaults using docopt's built-in functionality
-    docopt_defaults = extract_docopt_defaults_using_docopt(doc)
+      # Extract defaults using docopt's built-in functionality
+      docopt_defaults = extract_docopt_defaults_using_docopt(doc)
 
-    # Parse config file if provided
+      # Parse config file if provided
     config_file : Hash(String, YAML::Any)? = nil
     if config_file_path && File.exists?(config_file_path)
       begin
@@ -154,6 +165,16 @@ module Docopt
     end
 
     ConfigOptions.new(args, docopt_defaults, config_file, env_vars)
+
+  rescue DocoptExit
+    # Show help with original docopt (complete with defaults)
+    puts original_doc
+    Process.exit(0)
+  rescue ex
+    # Handle other exceptions
+    puts "Error: #{ex.message}"
+    Process.exit(1)
+  end
   end
 
   # Remove default specifications from docopt string
