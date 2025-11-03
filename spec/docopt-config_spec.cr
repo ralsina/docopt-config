@@ -192,6 +192,23 @@ DOC
       options["--verbose"].should eq("multiline-default")
     end
 
+    it "handles mixed options with some having defaults and others not" do
+      doc = <<-DOC
+Usage: test [--simple] [--verbose=<level>]
+
+Options:
+  --simple         A simple flag without default
+  --verbose=<level> Set the verbosity level
+                    This is a longer description
+                    that spans multiple lines
+                    [default: mixed-default]
+DOC
+
+      options = Docopt.docopt_config(doc, argv: [] of String)
+      options["--simple"].should be_nil  # No default
+      options["--verbose"].should eq("mixed-default")  # Has default
+    end
+
     it "implements correct precedence: CLI > env vars > config file > docopt defaults" do
       doc = <<-DOC
 Usage: test [--verbose=<level>]

@@ -4,7 +4,8 @@
       "Bash(shards build:*)",
       "Bash(crystal spec:*)",
       "Bash(crystal run:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []

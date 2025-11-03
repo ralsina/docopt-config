@@ -114,8 +114,8 @@ module Docopt
     # Parse command line arguments using docopt without defaults
     args = Docopt.docopt(doc_without_defaults, argv: argv, help: help, version: version, options_first: options_first)
 
-    # Parse original docopt to extract defaults
-    docopt_defaults = extract_docopt_defaults(doc)
+    # Parse original docopt to extract defaults using docopt's built-in functionality
+    docopt_defaults = extract_docopt_defaults_using_docopt(doc)
 
     # Parse config file if provided
     config_file : Hash(String, YAML::Any)? = nil
@@ -161,50 +161,26 @@ module Docopt
     doc.gsub(/\s*\[default:\s*([^\]]+)\]/, "")
   end
 
-  # Extract default values from docopt string
-  private def self.extract_docopt_defaults(doc : String) : Hash(String, (Nil | String | Int32 | Bool | Array(String)))
+  # Extract default values using docopt's built-in parse_defaults functionality
+  private def self.extract_docopt_defaults_using_docopt(doc : String) : Hash(String, (Nil | String | Int32 | Bool | Array(String)))
     defaults = Hash(String, (Nil | String | Int32 | Bool | Array(String))).new
 
-    # Find option patterns with defaults on the same line or multiline
-    doc.scan(/--([^\s=<]+)(=<[^>]+>)?[\s\S]*?\[default:\s*([^\]]+)\]/m) do |match|
-      option_name = match[1]
-      has_value = match[2] ? true : false
-      default_value = match[3]
+    # Use docopt's own parse_defaults to get Option objects with default values
+    option_objects = Docopt.parse_defaults(doc)
 
-      if has_value
-        full_option_name = "--#{option_name}"
-        parsed_value = parse_default_value(default_value.strip)
-        defaults[full_option_name] = parsed_value if parsed_value
-      end
-    end
+    option_objects.each do |option|
+      if option.responds_to?(:long) && option.responds_to?(:value) && option.responds_to?(:argcount)
+        long_name = option.long
+        default_value = option.value
+        argcount = option.argcount
 
-    # Also handle the case where defaults are on the next line
-    lines = doc.split('\n')
-    i = 0
-    while i < lines.size
-      line = lines[i].strip
-
-      # Look for option lines that have values
-      if line.match(/^\s*--([^\s=<]+)(=<[^>]+>)?/)
-        option_name = $1
-        has_value = $2 ? true : false
-
-        # Check if next line contains a default for this option
-        if i + 1 < lines.size
-          next_line = lines[i + 1].strip
-          if next_line.match(/\[default:\s*([^\]]+)\]/)
-            default_value = $1
-
-            if has_value && !defaults.has_key?("--#{option_name}")
-              full_option_name = "--#{option_name}"
-              parsed_value = parse_default_value(default_value.strip)
-              defaults[full_option_name] = parsed_value if parsed_value
-            end
-          end
+        # Only include options that have arguments (argcount > 0) and have default values
+        if long_name && argcount > 0 && default_value
+          # Convert the default value to the appropriate type
+          parsed_value = parse_default_value(default_value.to_s)
+          defaults[long_name.to_s] = parsed_value if parsed_value
         end
       end
-
-      i += 1
     end
 
     defaults
