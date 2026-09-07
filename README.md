@@ -109,6 +109,8 @@ export MYAPP_OUTPUT_FILE="/path/to/output.txt"
 export MYAPP_FORCE=true
 ```
 
+Values are coerced to the type docopt would produce for the option: flags accept `true`/`yes`/`1` and `false`/`no`/`0` as booleans (anything else is kept as a string), repeatable flags like `-v...` accept a count (`MYAPP_V=3` → `3`), and repeatable options split comma-separated values into an array (`MYAPP_TAGS="a, b"` → `["a", "b"]`). Short options like `-v` map from `PREFIX_V`.
+
 ### Precedence Order
 
 The library follows this precedence order (highest to lowest):

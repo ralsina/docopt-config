@@ -27,20 +27,20 @@ module Docopt
       # user-provided and the lower tiers get a chance to answer.
       return @args[key] if provided_by_cli?(key)
 
-      # Check environment variables second
-      return @env_vars[key] if @env_vars.has_key?(key)
+      # Check environment variables second (env keys are always long form)
+      return env_value(key) if @env_vars.has_key?(long_key(key))
 
       # Check config file third
       if config = @config_file
-        # First try exact key match (for quoted keys like "--verbose")
+        # First try exact key match (for quoted keys like "--verbose" or "-v")
         return config_value(config[key]) if config.has_key?(key)
 
-        # Then try clean key match (for unquoted keys like "verbose" or "input_file")
-        clean_key = key.gsub(/^--+/, "")
+        # Then try clean key match (for unquoted keys like "verbose" or "v")
+        clean_key = key.gsub(/^-+/, "")
         return config_value(config[clean_key]) if config.has_key?(clean_key)
 
         # Finally try snake_case key (for "input_file" matching "--input-file")
-        snake_key = key.gsub(/^--/, "").gsub(/-/, "_")
+        snake_key = clean_key.gsub(/-/, "_")
         return config_value(config[snake_key]) if config.has_key?(snake_key)
       end
 
@@ -59,9 +59,15 @@ module Docopt
 
     def has_key?(key : String) : Bool
       return true if provided_by_cli?(key)
-      return true if @env_vars.has_key?(key)
+      return true if @env_vars.has_key?(long_key(key))
       config = @config_file
       !config.nil? && config.has_key?(key)
+    end
+
+    # Normalize an option key to long form ("-v" becomes "--v"), which is
+    # the shape environment variables are stored under.
+    private def long_key(key : String) : String
+      key.starts_with?("--") ? key : "--" + key.lstrip('-')
     end
 
     # Whether the key was actually given on the command line, as opposed to
@@ -74,6 +80,28 @@ module Docopt
       when Int32 then value != 0
       when Array then !value.empty?
       else            !value.nil?
+      end
+    end
+
+    # Environment variables are strings; coerce them to the type docopt
+    # would produce for the option, based on how the CLI parse typed the
+    # key: Bool for flags, Int32 for repeatable flags/commands, arrays
+    # (comma separated) for repeatable options, raw strings otherwise.
+    private def env_value(key : String) : OptionValue?
+      raw = @env_vars[long_key(key)]
+      case @args[key]?
+      when Bool
+        case raw.downcase
+        when "true", "yes", "1" then true
+        when "false", "no", "0" then false
+        else                         raw
+        end
+      when Int32
+        raw.to_i32? || raw
+      when Array
+        raw.split(",").map(&.strip).reject(&.empty?)
+      else
+        raw
       end
     end
 

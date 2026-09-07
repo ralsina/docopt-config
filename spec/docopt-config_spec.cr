@@ -404,15 +404,73 @@ describe Docopt do
     it "lets a config file enable a repeatable flag not given on the CLI" do
       doc = "Usage: test [-v...]"
       temp_config = "/tmp/test_config.yml"
-      # Short options need the exact key; only long options get the
-      # clean/snake_case fallbacks.
-      File.write(temp_config, {"-v" => 3}.to_yaml)
+      File.write(temp_config, {"v" => 3}.to_yaml)
 
       begin
         options = Docopt.docopt_config(doc, argv: [] of String, config_file_path: temp_config)
         options["-v"].should eq(3)
       ensure
         File.delete(temp_config) if File.exists?(temp_config)
+      end
+    end
+
+    it "coerces boolean env vars for flags" do
+      doc = "Usage: test [--force]"
+      ENV["TEST_FORCE"] = "false"
+
+      begin
+        options = Docopt.docopt_config(doc, argv: [] of String, env_prefix: "TEST")
+        options["--force"].should be_false
+      ensure
+        ENV.delete("TEST_FORCE")
+      end
+    end
+
+    it "coerces truthy env var spellings for flags" do
+      doc = "Usage: test [--force]"
+      ENV["TEST_FORCE"] = "yes"
+
+      begin
+        options = Docopt.docopt_config(doc, argv: [] of String, env_prefix: "TEST")
+        options["--force"].should be_true
+      ensure
+        ENV.delete("TEST_FORCE")
+      end
+    end
+
+    it "keeps unrecognized env var values for flags as strings" do
+      doc = "Usage: test [--force]"
+      ENV["TEST_FORCE"] = "maybe"
+
+      begin
+        options = Docopt.docopt_config(doc, argv: [] of String, env_prefix: "TEST")
+        options["--force"].should eq("maybe")
+      ensure
+        ENV.delete("TEST_FORCE")
+      end
+    end
+
+    it "splits comma separated env vars into arrays for repeatable options" do
+      doc = "Usage: test [--font=<font>...]"
+      ENV["TEST_FONT"] = "a.ttf, b.ttf"
+
+      begin
+        options = Docopt.docopt_config(doc, argv: [] of String, env_prefix: "TEST")
+        options["--font"].should eq(["a.ttf", "b.ttf"])
+      ensure
+        ENV.delete("TEST_FONT")
+      end
+    end
+
+    it "coerces numeric env vars into counts for repeatable flags" do
+      doc = "Usage: test [-v...]"
+      ENV["TEST_V"] = "3"
+
+      begin
+        options = Docopt.docopt_config(doc, argv: [] of String, env_prefix: "TEST")
+        options["-v"].should eq(3)
+      ensure
+        ENV.delete("TEST_V")
       end
     end
 
