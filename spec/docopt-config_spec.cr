@@ -112,11 +112,11 @@ describe Docopt do
 
     it "handles docopt defaults when no other sources are available" do
       doc = <<-DOC
-Usage: test [--verbose=<level>]
+        Usage: test [--verbose=<level>]
 
-Options:
-  --verbose=<level>  Verbosity level [default: docopt-default]
-DOC
+        Options:
+          --verbose=<level>  Verbosity level [default: docopt-default]
+        DOC
 
       options = Docopt.docopt_config(doc, argv: [] of String)
       options["--verbose"].should eq("docopt-default")
@@ -124,11 +124,11 @@ DOC
 
     it "allows environment variables to override docopt defaults" do
       doc = <<-DOC
-Usage: test [--verbose=<level>]
+        Usage: test [--verbose=<level>]
 
-Options:
-  --verbose=<level>  Verbosity level [default: docopt-default]
-DOC
+        Options:
+          --verbose=<level>  Verbosity level [default: docopt-default]
+        DOC
 
       ENV["TEST_VERBOSE"] = "env-different-value"
 
@@ -142,11 +142,11 @@ DOC
 
     it "allows CLI arguments to take precedence even when equal to docopt default" do
       doc = <<-DOC
-Usage: test [--verbose=<level>]
+        Usage: test [--verbose=<level>]
 
-Options:
-  --verbose=<level>  Verbosity level [default: same-value]
-DOC
+        Options:
+          --verbose=<level>  Verbosity level [default: same-value]
+        DOC
 
       ENV["TEST_VERBOSE"] = "different-value"
 
@@ -160,11 +160,11 @@ DOC
 
     it "allows config files to override docopt defaults" do
       doc = <<-DOC
-Usage: test [--verbose=<level>]
+        Usage: test [--verbose=<level>]
 
-Options:
-  --verbose=<level>  Verbosity level [default: docopt-default]
-DOC
+        Options:
+          --verbose=<level>  Verbosity level [default: docopt-default]
+        DOC
 
       temp_config = "/tmp/test_config.yml"
       File.write(temp_config, {"verbose" => "config-value"}.to_yaml)
@@ -179,14 +179,14 @@ DOC
 
     it "handles multiline option descriptions correctly" do
       doc = <<-DOC
-Usage: test [--verbose=<level>]
+        Usage: test [--verbose=<level>]
 
-Options:
-  --verbose=<level>  Set the verbosity level
-                    This is a longer description
-                    that spans multiple lines
-                    [default: multiline-default]
-DOC
+        Options:
+          --verbose=<level>  Set the verbosity level
+                            This is a longer description
+                            that spans multiple lines
+                            [default: multiline-default]
+        DOC
 
       options = Docopt.docopt_config(doc, argv: [] of String)
       options["--verbose"].should eq("multiline-default")
@@ -194,28 +194,102 @@ DOC
 
     it "handles mixed options with some having defaults and others not" do
       doc = <<-DOC
-Usage: test [--simple] [--verbose=<level>]
+        Usage: test [--simple] [--verbose=<level>]
 
-Options:
-  --simple         A simple flag without default
-  --verbose=<level> Set the verbosity level
-                    This is a longer description
-                    that spans multiple lines
-                    [default: mixed-default]
-DOC
+        Options:
+          --simple         A simple flag without default
+          --verbose=<level> Set the verbosity level
+                            This is a longer description
+                            that spans multiple lines
+                            [default: mixed-default]
+        DOC
 
       options = Docopt.docopt_config(doc, argv: [] of String)
       options["--simple"].should be_nil               # No default
       options["--verbose"].should eq("mixed-default") # Has default
     end
 
+    it "converts integer config values to integers" do
+      doc = "Usage: test [--count=<n>]"
+      temp_config = "/tmp/test_config.yml"
+      File.write(temp_config, {"count" => 10}.to_yaml)
+
+      begin
+        options = Docopt.docopt_config(doc, config_file_path: temp_config)
+        options["--count"].should eq(10)
+      ensure
+        File.delete(temp_config) if File.exists?(temp_config)
+      end
+    end
+
+    it "converts boolean config values to booleans" do
+      doc = "Usage: test [--force]"
+      temp_config = "/tmp/test_config.yml"
+      File.write(temp_config, {"force" => true}.to_yaml)
+
+      begin
+        options = Docopt.docopt_config(doc, config_file_path: temp_config)
+        options["--force"].should be_true
+      ensure
+        File.delete(temp_config) if File.exists?(temp_config)
+      end
+    end
+
+    it "converts config file sequences to arrays for repeatable options" do
+      doc = "Usage: test [--font=<font>...]"
+      temp_config = "/tmp/test_config.yml"
+      File.write(temp_config, {"font" => ["a.ttf", "b.ttf"]}.to_yaml)
+
+      begin
+        options = Docopt.docopt_config(doc, config_file_path: temp_config)
+        options["--font"].should eq(["a.ttf", "b.ttf"])
+      ensure
+        File.delete(temp_config) if File.exists?(temp_config)
+      end
+    end
+
+    it "treats a single-element config file sequence as an array" do
+      doc = "Usage: test [--font=<font>...]"
+      temp_config = "/tmp/test_config.yml"
+      File.write(temp_config, {"font" => ["only.ttf"]}.to_yaml)
+
+      begin
+        options = Docopt.docopt_config(doc, config_file_path: temp_config)
+        options["--font"].should eq(["only.ttf"])
+      ensure
+        File.delete(temp_config) if File.exists?(temp_config)
+      end
+    end
+
+    it "stringifies non-string elements of config file sequences" do
+      doc = "Usage: test [--font=<font>...]"
+      temp_config = "/tmp/test_config.yml"
+      File.write(temp_config, {"font" => ["a.ttf", 2]}.to_yaml)
+
+      begin
+        options = Docopt.docopt_config(doc, config_file_path: temp_config)
+        options["--font"].should eq(["a.ttf", "2"])
+      ensure
+        File.delete(temp_config) if File.exists?(temp_config)
+      end
+    end
+
+    it "keeps arrays from repeated CLI arguments for repeatable options" do
+      doc = "Usage: test [--font=<font>...]"
+      argv = ["--font", "cli1.ttf", "--font", "cli2.ttf"]
+
+      options = Docopt.docopt_config(doc, argv: argv)
+
+      options["--font"].should eq(["cli1.ttf", "cli2.ttf"])
+    end
+
     it "implements correct precedence: CLI > env vars > config file > docopt defaults" do
       doc = <<-DOC
-Usage: test [--verbose=<level>]
+        Usage: test [--verbose=<level>]
 
-Options:
-  --verbose=<level>  Verbosity level [default: docopt-default]
-DOC
+        Options:
+          --verbose=<level>  Verbosity level [default: docopt-default]
+        DOC
 
       temp_config = "/tmp/test_config.yml"
       File.write(temp_config, {"verbose" => "config-value"}.to_yaml)

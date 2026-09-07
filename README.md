@@ -71,7 +71,7 @@ count: 42
 
 For the docopt usage pattern:
 ```
-Usage: myapp [--verbose=<level>] [--output=<file>] [--force] [--input-file=<path>] [--count=<number>]
+Usage: myapp [--verbose=<level>] [--output=<file>] [--force] [--input-file=<path>] [--count=<number>] [--tag=<tag>...]
 ```
 
 Your configuration file would look like:
@@ -82,7 +82,12 @@ output: "default_output.txt"      # String with quotes (maps to --output)
 force: true                       # Boolean value (maps to --force)
 input_file: "/data/input.csv"     # Path with quotes (maps to --input-file)
 count: 10                         # Numeric value (maps to --count)
+tags:                             # Sequence (maps to repeatable --tag)
+  - "one"
+  - "two"
 ```
+
+Values are coerced to the type docopt would produce: `true`/`false` become booleans, numbers become integers, sequences become arrays of strings (so repeatable options like `--tag=<tag>...` can be set from the config file), and anything else becomes a string.
 
 **Note**: The library automatically maps configuration keys to docopt options by:
 - Converting snake_case to kebab-case (`input_file` → `--input-file`)

@@ -2,9 +2,12 @@ require "docopt"
 require "yaml"
 
 module Docopt
+  # The type of a docopt option value: what Docopt.docopt returns in its hash.
+  alias OptionValue = String | Int32 | Bool | Array(String)
+
   class ConfigOptions
-    property args : Hash(String, (Nil | String | Int32 | Bool | Array(String)))
-    property docopt_defaults : Hash(String, (Nil | String | Int32 | Bool | Array(String)))
+    property args : Hash(String, OptionValue?)
+    property docopt_defaults : Hash(String, OptionValue?)
     property config_file : Hash(String, YAML::Any)?
     property env_vars : Hash(String, String)
 
@@ -12,65 +15,27 @@ module Docopt
     end
 
     # Get a configuration value with precedence: CLI > env vars > config file > docopt defaults
-    def [](key : String) : (Nil | String | Int32 | Bool | Array(String))
-      # Check CLI arguments first (any non-nil value in args is from CLI since we parsed without defaults)
-      if @args.has_key?(key) && !@args[key].nil?
-        return @args[key]
-      end
+    def [](key : String) : OptionValue?
+      # Check CLI arguments first. Flags not given parse as false and
+      # repeatable options not given parse as [], so neither counts as
+      # user-provided and the lower tiers get a chance to answer.
+      return @args[key] if provided_by_cli?(key)
 
       # Check environment variables second
-      if @env_vars.has_key?(key)
-        return @env_vars[key]
-      end
+      return @env_vars[key] if @env_vars.has_key?(key)
 
       # Check config file third
       if config = @config_file
         # First try exact key match (for quoted keys like "--verbose")
-        if config.has_key?(key)
-          value = config[key]
-          return case value.raw
-          when String
-            value.as_s
-          when Bool
-            value.as_bool
-          when Int64
-            value.as_i.to_i32
-          else
-            value.to_s
-          end
-        end
+        return config_value(config[key]) if config.has_key?(key)
 
         # Then try clean key match (for unquoted keys like "verbose" or "input_file")
         clean_key = key.gsub(/^--+/, "")
-        if config.has_key?(clean_key)
-          value = config[clean_key]
-          return case value.raw
-          when String
-            value.as_s
-          when Bool
-            value.as_bool
-          when Int64
-            value.as_i.to_i32
-          else
-            value.to_s
-          end
-        end
+        return config_value(config[clean_key]) if config.has_key?(clean_key)
 
         # Finally try snake_case key (for "input_file" matching "--input-file")
         snake_key = key.gsub(/^--/, "").gsub(/-/, "_")
-        if config.has_key?(snake_key)
-          value = config[snake_key]
-          return case value.raw
-          when String
-            value.as_s
-          when Bool
-            value.as_bool
-          when Int64
-            value.as_i.to_i32
-          else
-            value.to_s
-          end
-        end
+        return config_value(config[snake_key]) if config.has_key?(snake_key)
       end
 
       # Finally return docopt default
@@ -82,25 +47,68 @@ module Docopt
       nil
     end
 
-    def []?(key : String) : (Nil | String | Int32 | Bool | Array(String))?
-      result = self[key]
-      result
+    def []?(key : String) : OptionValue?
+      self[key]
     end
 
     def has_key?(key : String) : Bool
-      @args.has_key?(key) ||
-        @env_vars.has_key?(key) ||
-        (if config = @config_file
-           config.has_key?(key)
-         else
-           false
-         end)
+      return true if provided_by_cli?(key)
+      return true if @env_vars.has_key?(key)
+      config = @config_file
+      !config.nil? && config.has_key?(key)
+    end
+
+    # Whether the key was actually given on the command line, as opposed to
+    # being docopt's representation of "not given" (false for flags, [] for
+    # repeatable options).
+    private def provided_by_cli?(key : String) : Bool
+      return false unless @args.has_key?(key)
+      case value = @args[key]
+      when Bool  then value == true
+      when Array then !value.empty?
+      else            !value.nil?
+      end
+    end
+
+    # Convert a YAML config value to an option value. Sequences become
+    # Array(String) so repeatable options can be set from the config file.
+    private def config_value(value : YAML::Any) : OptionValue?
+      case value.raw
+      when String
+        value.as_s
+      when Bool
+        value.as_bool
+      when Int64
+        value.as_i.to_i32
+      when Array
+        value.as_a.map do |element|
+          element.raw.is_a?(String) ? element.as_s : element.to_s
+        end
+      else
+        value.to_s
+      end
     end
   end
 
   # Helper method to convert environment variable names to option format
   private def self.env_to_key(key : String) : String
     "--" + key.downcase.gsub(/_+/, "-")
+  end
+
+  # Collect the environment variables relevant to options, converted to
+  # option format. With a prefix, only variables starting with
+  # "#{env_prefix}_" are used (prefix stripped); without one, all are.
+  private def self.collect_env_vars(env_prefix : String?) : Hash(String, String)
+    env_vars = Hash(String, String).new
+    ENV.each do |key, value|
+      if env_prefix
+        next unless key.starts_with?(env_prefix + "_")
+        env_vars[env_to_key(key[env_prefix.size + 1..-1])] = value
+      else
+        env_vars[env_to_key(key)] = value
+      end
+    end
+    env_vars
   end
 
   # Main function to parse docopt with config file and environment variable support
@@ -154,29 +162,14 @@ module Docopt
             stringified_config[key.as_s] = value
           end
           config_file = stringified_config
-        rescue ex
+        rescue
           # If config file parsing fails, continue without it
           config_file = nil
         end
       end
 
       # Get relevant environment variables
-      env_vars = Hash(String, String).new
-      ENV.each do |key, value|
-        # If env_prefix is provided, only include vars with that prefix
-        if env_prefix
-          if key.starts_with?(env_prefix + "_")
-            # Remove prefix and convert to config key format
-            env_part = key[env_prefix.size + 1..-1]
-            config_key = env_to_key(env_part)
-            env_vars[config_key] = value
-          end
-        else
-          # Include all environment variables, convert to config key format
-          config_key = env_to_key(key)
-          env_vars[config_key] = value
-        end
-      end
+      env_vars = collect_env_vars(env_prefix)
 
       ConfigOptions.new(args, docopt_defaults, config_file, env_vars)
     rescue DocoptExit
@@ -196,8 +189,8 @@ module Docopt
   end
 
   # Extract default values using docopt's built-in parse_defaults functionality
-  private def self.extract_docopt_defaults_using_docopt(doc : String) : Hash(String, (Nil | String | Int32 | Bool | Array(String)))
-    defaults = Hash(String, (Nil | String | Int32 | Bool | Array(String))).new
+  private def self.extract_docopt_defaults_using_docopt(doc : String) : Hash(String, OptionValue?)
+    defaults = Hash(String, OptionValue?).new
 
     # Use docopt's own parse_defaults to get Option objects with default values
     option_objects = Docopt.parse_defaults(doc)
@@ -221,7 +214,7 @@ module Docopt
   end
 
   # Parse default value to appropriate type
-  private def self.parse_default_value(value : String) : (Nil | String | Int32 | Bool | Array(String))
+  private def self.parse_default_value(value : String) : OptionValue?
     case value.downcase
     when "true", "yes"
       true
