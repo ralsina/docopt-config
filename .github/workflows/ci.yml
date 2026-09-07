@@ -27,4 +27,6 @@ jobs:
       - name: Install dependencies
         run: shards install
       - name: Lint
-        run: ./lib/ameba/bin/ameba
+        run: |
+          crystal build lib/ameba/bin/ameba.cr -o /tmp/ameba
+          /tmp/ameba
