@@ -18,5 +18,13 @@ jobs:
         run: shards install
       - name: Run specs
         run: crystal spec
+
+  lint:
+    runs-on: ubuntu-latest
+    container: crystallang/crystal:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: shards install
       - name: Lint
         run: ./lib/ameba/bin/ameba
