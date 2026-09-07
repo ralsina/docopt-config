@@ -11,3 +11,7 @@ license: MIT
 dependencies:
   docopt:
     github: ralsina/docopt.cr
+
+development_dependencies:
+  ameba:
+    github: crystal-ameba/ameba

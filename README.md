@@ -17,7 +17,7 @@ A Crystal library that extends docopt to support configuration files and environ
    ```yaml
    dependencies:
      docopt-config:
-       github: your-github-user/docopt-config
+       github: ralsina/docopt-config
    ```
 
 2. Run `shards install`
@@ -174,4 +174,4 @@ shards install
 
 ## Contributors
 
-- [Roberto Alsina](https://github.com/your-github-user) - creator and maintainer
+- [Roberto Alsina](https://github.com/ralsina) - creator and maintainer
