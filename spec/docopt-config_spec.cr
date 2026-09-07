@@ -511,6 +511,48 @@ describe Docopt do
       options["--force"].should be_nil
     end
 
+    it "keeps config file floats as floats" do
+      doc = "Usage: test [--ratio=<r>]"
+      temp_config = "/tmp/test_config.yml"
+      File.write(temp_config, {"ratio" => 2.5}.to_yaml)
+
+      begin
+        options = Docopt.docopt_config(doc, argv: [] of String, config_file_path: temp_config)
+        options["--ratio"].should eq(2.5)
+        options["--ratio"].should be_a(Float64)
+      ensure
+        File.delete(temp_config) if File.exists?(temp_config)
+      end
+    end
+
+    it "keeps config file integers that overflow Int32 as Int64" do
+      doc = "Usage: test [--count=<n>]"
+      temp_config = "/tmp/test_config.yml"
+      File.write(temp_config, {"count" => 9999999999}.to_yaml)
+
+      begin
+        options = Docopt.docopt_config(doc, argv: [] of String, config_file_path: temp_config)
+        options["--count"].should eq(9999999999)
+        options["--count"].should be_a(Int64)
+      ensure
+        File.delete(temp_config) if File.exists?(temp_config)
+      end
+    end
+
+    it "keeps float docopt defaults as floats" do
+      doc = <<-DOC
+        Usage: test [--ratio=<r>]
+
+        Options:
+          --ratio=<r>  Aspect ratio [default: 2.5]
+        DOC
+
+      options = Docopt.docopt_config(doc, argv: [] of String)
+
+      options["--ratio"].should eq(2.5)
+      options["--ratio"].should be_a(Float64)
+    end
+
     it "raises DocoptExit for invalid arguments when exit is false" do
       doc = "Usage: test [--verbose=<level>]"
 

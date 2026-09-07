@@ -2,8 +2,10 @@ require "docopt"
 require "yaml"
 
 module Docopt
-  # The type of a docopt option value: what Docopt.docopt returns in its hash.
-  alias OptionValue = String | Int32 | Bool | Array(String)
+  # The type of a docopt option value: what Docopt.docopt returns in its
+  # hash, plus Int64/Float64 which config files and defaults can supply for
+  # values docopt itself would only carry as strings.
+  alias OptionValue = String | Int32 | Int64 | Float64 | Bool | Array(String)
 
   # Raised instead of exiting when docopt_config is called with exit: false
   # and the process would have terminated normally (help or version request).
@@ -12,7 +14,9 @@ module Docopt
   class ConfigExit < DocoptException; end
 
   class ConfigOptions
-    property args : Hash(String, OptionValue?)
+    # Values as docopt itself produces them; only defaults and config/env
+    # sources can widen to Int64/Float64 (see OptionValue).
+    property args : Hash(String, (Nil | String | Int32 | Bool | Array(String)))
     property docopt_defaults : Hash(String, OptionValue?)
     property config_file : Hash(String, YAML::Any)?
     property env_vars : Hash(String, String)
@@ -112,6 +116,8 @@ module Docopt
 
     # Convert a YAML config value to an option value. Sequences become
     # Array(String) so repeatable options can be set from the config file.
+    # Numbers keep their magnitude: Int64 that fits an Int32 is narrowed,
+    # otherwise (and for floats) the original type is preserved.
     private def config_value(value : YAML::Any) : OptionValue?
       case value.raw
       when String
@@ -119,7 +125,10 @@ module Docopt
       when Bool
         value.as_bool
       when Int64
-        value.as_i.to_i32
+        int = value.as_i64
+        (int >= Int32::MIN && int <= Int32::MAX) ? int.to_i32 : int
+      when Float64
+        value.as_f
       when Array
         value.as_a.map do |element|
           element.raw.is_a?(String) ? element.as_s : element.to_s
@@ -280,10 +289,10 @@ module Docopt
     when "false", "no"
       false
     when /^\d+$/
-      value.to_i32
+      value.to_i32? || value.to_i64
     when /^\d+\.\d+$/
-      value.to_f.to_i32 # Convert to int32 to match expected type
-    when /^".*"$/, /^'.*'$/
+      value.to_f
+    when /^".*"$/, /^'.*'/
       value[1..-2] # Remove quotes
     else
       value
