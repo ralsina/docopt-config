@@ -620,6 +620,47 @@ describe Docopt do
 
       ex.message.should eq("--verbose requires argument")
     end
+
+    it "prints the effective configuration when the print option is given" do
+      doc = "Usage: test [--verbose=<level>] [--font=<font>...]"
+      ENV["TEST_VERBOSE"] = "9"
+      temp_config = File.tempname("docopt-config", ".yml")
+      File.write(temp_config, {"font" => ["one.ttf", "two.ttf"]}.to_yaml)
+      io = IO::Memory.new
+
+      begin
+        expect_raises(Docopt::ConfigExit) do
+          Docopt.docopt_config(doc, argv: ["--print-config"], config_file_path: temp_config,
+            env_prefix: "TEST", print_config_option: "--print-config", exit: false, io: io)
+        end
+
+        yaml = YAML.parse(io.to_s)
+        yaml["verbose"].should eq("9")                                  # env tier
+        yaml["font"].as_a.map(&.as_s).should eq(["one.ttf", "two.ttf"]) # config tier
+      ensure
+        File.delete(temp_config) if File.exists?(temp_config)
+        ENV.delete("TEST_VERBOSE")
+      end
+    end
+
+    it "returns options normally when the print option is not in argv" do
+      doc = "Usage: test [--verbose=<level>]"
+      io = IO::Memory.new
+
+      options = Docopt.docopt_config(doc, argv: ["--verbose", "1"],
+        print_config_option: "--print-config", exit: false, io: io)
+
+      io.to_s.should be_empty
+      options["--verbose"].should eq("1")
+    end
+
+    it "treats the print option as an unknown option when not configured" do
+      doc = "Usage: test [--verbose=<level>]"
+
+      expect_raises(Docopt::DocoptExit) do
+        Docopt.docopt_config(doc, argv: ["--print-config"], exit: false)
+      end
+    end
   end
 
   describe Docopt::ConfigOptions do
@@ -655,6 +696,21 @@ describe Docopt do
 
       options["-v"].should eq(3)
       options.has_key?("-v").should be_true
+    end
+
+    it "serializes the effective configuration as snake_case YAML" do
+      args = {"--verbose" => nil, "--font" => ["cli.ttf"], "--force" => false} of String => Docopt::DocoptValue?
+      defaults = {"--input-file" => "/data/default.csv"} of String => Docopt::OptionValue?
+      env = {"--verbose" => "9"} of String => String
+      config = config_from_yaml("font:\n  - one.ttf\n  - two.ttf\nforce: true\n")
+
+      options = Docopt::ConfigOptions.new(args, defaults, config, env)
+
+      yaml = YAML.parse(options.to_config_yaml)
+      yaml["verbose"].should eq("9")
+      yaml["font"].as_a.map(&.as_s).should eq(["cli.ttf"]) # CLI beats config
+      yaml["force"].should be_true
+      yaml["input_file"].should eq("/data/default.csv")
     end
   end
 end

@@ -82,7 +82,7 @@ output: "default_output.txt"      # String with quotes (maps to --output)
 force: true                       # Boolean value (maps to --force)
 input_file: "/data/input.csv"     # Path with quotes (maps to --input-file)
 count: 10                         # Numeric value (maps to --count)
-tags:                             # Sequence (maps to repeatable --tag)
+tag:                              # Sequence (maps to repeatable --tag)
   - "one"
   - "two"
 ```
@@ -149,6 +149,25 @@ options = Docopt.docopt_config(doc, argv: ["--verbose", "5"])
 io = IO::Memory.new
 options = Docopt.docopt_config(doc, argv: ["--help"], exit: false, io: io)
 ```
+
+### Printing the effective configuration
+
+Libraries can opt in to a `--print-config`-style flag that prints every option declared in the doc, resolved through the full precedence chain, as YAML with snake_case keys:
+
+```crystal
+options = Docopt.docopt_config(
+  doc,
+  config_file_path: "config.yml",
+  env_prefix: "MYAPP",
+  print_config_option: "--print-config"
+)
+```
+
+```bash
+myapp --print-config > config.yml   # the output is a working config file
+```
+
+The flag does not need to be declared in the doc, is only recognized before a `--` separator, and when given the process prints the configuration and exits with status 0. With `exit: false`, the YAML is written to `io` and a `Docopt::ConfigExit` is raised instead.
 
 ## Development
 

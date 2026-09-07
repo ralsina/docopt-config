@@ -76,6 +76,25 @@ module Docopt
       [key, clean_key, clean_key.gsub(/-/, "_")].uniq
     end
 
+    # The effective configuration (every option declared in the doc,
+    # resolved through the full precedence chain) as YAML text. Keys are
+    # snake_case so the output can be used as a config file directly;
+    # options that resolve to nil are omitted.
+    def to_config_yaml : String
+      result = Hash(String, OptionValue?).new
+      (@args.keys + @docopt_defaults.keys).uniq.each do |key|
+        next unless key.starts_with?("-")
+        value = self[key]
+        result[config_name(key)] = value unless value.nil?
+      end
+      result.to_yaml
+    end
+
+    # snake_case name for an option key: "--input-file" becomes "input_file".
+    private def config_name(key : String) : String
+      key.gsub(/^-+/, "").gsub(/-/, "_")
+    end
+
     # Normalize an option key to long form ("-v" becomes "--v"), which is
     # the shape environment variables are stored under.
     private def long_key(key : String) : String
@@ -164,6 +183,34 @@ module Docopt
     env_vars
   end
 
+  # Remove the first occurrence of option from argv, considering only
+  # tokens before the "--" separator. Returns nil if it is not present.
+  private def self.remove_print_config(argv : Array(String), option : String) : Array(String)?
+    limit = argv.index("--") || argv.size
+    pos = argv[0, limit].index(option)
+    return unless pos
+    stripped = argv.dup
+    stripped.delete_at(pos)
+    stripped
+  end
+
+  # Split the print-config flag off argv (only before a "--" separator),
+  # returning the argv to parse and whether printing was requested.
+  private def self.split_print_config(argv : Array(String), option : String?) : Tuple(Array(String), Bool)
+    return argv, false unless option
+    stripped = remove_print_config(argv, option)
+    stripped ? {stripped, true} : {argv, false}
+  end
+
+  # Write the effective configuration as YAML to io and terminate (or raise
+  # ConfigExit when exit is false). Does nothing unless requested.
+  private def self.emit_print_config(options : ConfigOptions, requested : Bool, exit : Bool, io : IO) : Nil
+    return unless requested
+    io.puts options.to_config_yaml
+    Process.exit(0) if exit
+    raise ConfigExit.new("print-config requested")
+  end
+
   # Handle --help / --version based on the parsed arguments, like docopt's
   # own extras(): only options actually declared in the doc trigger them,
   # and tokens after "--" (parsed as positionals) never do. Exits (or
@@ -192,15 +239,20 @@ module Docopt
                          version : String? = nil,
                          options_first : Bool = false,
                          exit : Bool = true,
-                         io : IO = STDOUT) : ConfigOptions
+                         io : IO = STDOUT,
+                         print_config_option : String? = nil) : ConfigOptions
     # Create a modified docopt string without defaults for parsing
     doc_without_defaults = remove_docopt_defaults(doc)
 
     begin
+      # The print-config flag is stripped before parsing so it does not
+      # need to be declared in the doc.
+      parse_argv, print_requested = split_print_config(argv, print_config_option)
+
       # Parse with exit=false to prevent automatic termination
       args = Docopt.docopt(
         doc_without_defaults,
-        argv: argv,
+        argv: parse_argv,
         help: false,  # Disable help since we handle it ourselves
         version: nil, # Disable version since we handle it ourselves
         options_first: options_first,
@@ -235,7 +287,9 @@ module Docopt
       # Get relevant environment variables
       env_vars = collect_env_vars(env_prefix)
 
-      ConfigOptions.new(args, docopt_defaults, config_file, env_vars)
+      options = ConfigOptions.new(args, docopt_defaults, config_file, env_vars)
+      emit_print_config(options, print_requested, exit, io)
+      options
     rescue ex : DocoptExit
       # Usage error: docopt convention is an optional message plus the usage
       # summary on stderr, and a non-zero exit status.
