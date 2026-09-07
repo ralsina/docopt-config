@@ -319,7 +319,7 @@ describe Docopt do
     end
 
     it "raises ConfigExit for help requests when exit is false" do
-      doc = "Usage: test [--verbose=<level>]"
+      doc = "Usage: test [--help]\n\nOptions:\n  --help  Show help"
       io = IO::Memory.new
 
       expect_raises(Docopt::ConfigExit) do
@@ -329,8 +329,17 @@ describe Docopt do
       io.to_s.should contain("Usage: test")
     end
 
+    it "raises ConfigExit for short -h help requests when exit is false" do
+      doc = "Usage: test [-h]\n\nOptions:\n  -h  Show help"
+      io = IO::Memory.new
+
+      expect_raises(Docopt::ConfigExit) do
+        Docopt.docopt_config(doc, argv: ["-h"], exit: false, io: io)
+      end
+    end
+
     it "raises ConfigExit for version requests when exit is false" do
-      doc = "Usage: test [--verbose=<level>]"
+      doc = "Usage: test [--version]\n\nOptions:\n  --version  Show version"
       io = IO::Memory.new
 
       expect_raises(Docopt::ConfigExit) do
@@ -340,15 +349,38 @@ describe Docopt do
       io.to_s.should eq("1.2.3\n")
     end
 
-    it "treats --help as a usage error when help is false" do
+    it "does not trigger help for --help after the -- separator" do
+      doc = "Usage: test [<file>]\n\nOptions:\n  --help  Show help"
+      io = IO::Memory.new
+
+      # docopt.cr currently treats the -- token itself as a positional, so
+      # this argv is a usage error; the point is that help is not shown.
+      expect_raises(Docopt::DocoptExit) do
+        Docopt.docopt_config(doc, argv: ["--", "--help"], exit: false, io: io)
+      end
+
+      io.to_s.should be_empty
+    end
+
+    it "treats an undeclared --help as a usage error" do
       doc = "Usage: test [--verbose=<level>]"
       io = IO::Memory.new
 
       expect_raises(Docopt::DocoptExit) do
-        Docopt.docopt_config(doc, argv: ["--help"], help: false, exit: false, io: io)
+        Docopt.docopt_config(doc, argv: ["--help"], exit: false, io: io)
       end
 
       io.to_s.should be_empty
+    end
+
+    it "parses normally instead of showing help when help is false" do
+      doc = "Usage: test [--help]\n\nOptions:\n  --help  Show help"
+      io = IO::Memory.new
+
+      options = Docopt.docopt_config(doc, argv: ["--help"], help: false, exit: false, io: io)
+
+      io.to_s.should be_empty
+      options["--help"].should be_true
     end
 
     it "raises DocoptExit for invalid arguments when exit is false" do

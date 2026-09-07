@@ -117,17 +117,19 @@ module Docopt
     env_vars
   end
 
-  # Handle --help / --version before any parsing happens. Exits (or raises
-  # ConfigExit when exit is false) after writing to io.
-  private def self.check_help_and_version(doc : String, argv : Array(String), help : Bool,
-                                          version : String?, exit : Bool, io : IO) : Nil
-    if help && (argv.includes?("--help") || argv.includes?("-h"))
+  # Handle --help / --version based on the parsed arguments, like docopt's
+  # own extras(): only options actually declared in the doc trigger them,
+  # and tokens after "--" (parsed as positionals) never do. Exits (or
+  # raises ConfigExit when exit is false) after writing to io.
+  private def self.handle_help_and_version(args : Hash(String, OptionValue?), doc : String,
+                                           help : Bool, version : String?, exit : Bool, io : IO) : Nil
+    if help && (args["--help"]? == true || args["-h"]? == true)
       io.puts doc
       Process.exit(0) if exit
       raise ConfigExit.new("help requested")
     end
 
-    if version && argv.includes?("--version")
+    if version && args["--version"]? == true
       io.puts version
       Process.exit(0) if exit
       raise ConfigExit.new("version requested")
@@ -144,12 +146,6 @@ module Docopt
                          options_first : Bool = false,
                          exit : Bool = true,
                          io : IO = STDOUT) : ConfigOptions
-    # Store original docopt for help display
-    original_doc = doc
-
-    # Early detection for help and version requests
-    check_help_and_version(original_doc, argv, help, version, exit, io)
-
     # Create a modified docopt string without defaults for parsing
     doc_without_defaults = remove_docopt_defaults(doc)
 
@@ -158,11 +154,13 @@ module Docopt
       args = Docopt.docopt(
         doc_without_defaults,
         argv: argv,
-        help: false,  # Disable help since we handle it above
-        version: nil, # Disable version since we handle it above
+        help: false,  # Disable help since we handle it ourselves
+        version: nil, # Disable version since we handle it ourselves
         options_first: options_first,
         exit: false
       )
+
+      handle_help_and_version(args, doc, help, version, exit, io)
 
       # Extract defaults using docopt's built-in functionality
       docopt_defaults = extract_docopt_defaults_using_docopt(doc)
