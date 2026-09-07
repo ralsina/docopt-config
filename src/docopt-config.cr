@@ -66,11 +66,12 @@ module Docopt
 
     # Whether the key was actually given on the command line, as opposed to
     # being docopt's representation of "not given" (false for flags, [] for
-    # repeatable options).
+    # repeatable options, 0 for repeatable flags/commands).
     private def provided_by_cli?(key : String) : Bool
       return false unless @args.has_key?(key)
       case value = @args[key]
       when Bool  then value == true
+      when Int32 then value != 0
       when Array then !value.empty?
       else            !value.nil?
       end

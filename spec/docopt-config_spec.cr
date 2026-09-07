@@ -401,6 +401,21 @@ describe Docopt do
       end
     end
 
+    it "lets a config file enable a repeatable flag not given on the CLI" do
+      doc = "Usage: test [-v...]"
+      temp_config = "/tmp/test_config.yml"
+      # Short options need the exact key; only long options get the
+      # clean/snake_case fallbacks.
+      File.write(temp_config, {"-v" => 3}.to_yaml)
+
+      begin
+        options = Docopt.docopt_config(doc, argv: [] of String, config_file_path: temp_config)
+        options["-v"].should eq(3)
+      ensure
+        File.delete(temp_config) if File.exists?(temp_config)
+      end
+    end
+
     it "raises DocoptExit for invalid arguments when exit is false" do
       doc = "Usage: test [--verbose=<level>]"
 
