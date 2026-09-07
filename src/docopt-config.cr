@@ -193,7 +193,8 @@ module Docopt
       # Usage error: docopt convention is an optional message plus the usage
       # summary on stderr, and a non-zero exit status.
       if exit
-        STDERR.puts ex.message if ex.message && !ex.message.empty?
+        message = ex.message
+        STDERR.puts message if message && !message.empty?
         STDERR.puts DocoptExit.usage unless DocoptExit.usage.empty?
         Process.exit(1)
       end
