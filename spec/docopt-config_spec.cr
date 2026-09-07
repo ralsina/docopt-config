@@ -73,7 +73,7 @@ describe Docopt do
 
     it "handles basic config file" do
       doc = "Usage: test [--verbose=<level>]"
-      temp_config = "/tmp/test_config.yml"
+      temp_config = File.tempname("docopt-config", ".yml")
       File.write(temp_config, {"--verbose" => "1"}.to_yaml)
 
       begin
@@ -86,7 +86,7 @@ describe Docopt do
 
     it "handles snake_case config keys" do
       doc = "Usage: test [--input-file=<path>]"
-      temp_config = "/tmp/test_config.yml"
+      temp_config = File.tempname("docopt-config", ".yml")
       File.write(temp_config, {"input_file" => "/path/to/file.txt"}.to_yaml)
 
       begin
@@ -99,7 +99,7 @@ describe Docopt do
 
     it "handles clean config keys without dashes" do
       doc = "Usage: test [--verbose=<level>]"
-      temp_config = "/tmp/test_config.yml"
+      temp_config = File.tempname("docopt-config", ".yml")
       File.write(temp_config, {"verbose" => "3"}.to_yaml)
 
       begin
@@ -166,7 +166,7 @@ describe Docopt do
           --verbose=<level>  Verbosity level [default: docopt-default]
         DOC
 
-      temp_config = "/tmp/test_config.yml"
+      temp_config = File.tempname("docopt-config", ".yml")
       File.write(temp_config, {"verbose" => "config-value"}.to_yaml)
 
       begin
@@ -211,7 +211,7 @@ describe Docopt do
 
     it "converts integer config values to integers" do
       doc = "Usage: test [--count=<n>]"
-      temp_config = "/tmp/test_config.yml"
+      temp_config = File.tempname("docopt-config", ".yml")
       File.write(temp_config, {"count" => 10}.to_yaml)
 
       begin
@@ -224,7 +224,7 @@ describe Docopt do
 
     it "converts boolean config values to booleans" do
       doc = "Usage: test [--force]"
-      temp_config = "/tmp/test_config.yml"
+      temp_config = File.tempname("docopt-config", ".yml")
       File.write(temp_config, {"force" => true}.to_yaml)
 
       begin
@@ -237,7 +237,7 @@ describe Docopt do
 
     it "converts config file sequences to arrays for repeatable options" do
       doc = "Usage: test [--font=<font>...]"
-      temp_config = "/tmp/test_config.yml"
+      temp_config = File.tempname("docopt-config", ".yml")
       File.write(temp_config, {"font" => ["a.ttf", "b.ttf"]}.to_yaml)
 
       begin
@@ -250,7 +250,7 @@ describe Docopt do
 
     it "treats a single-element config file sequence as an array" do
       doc = "Usage: test [--font=<font>...]"
-      temp_config = "/tmp/test_config.yml"
+      temp_config = File.tempname("docopt-config", ".yml")
       File.write(temp_config, {"font" => ["only.ttf"]}.to_yaml)
 
       begin
@@ -263,7 +263,7 @@ describe Docopt do
 
     it "stringifies non-string elements of config file sequences" do
       doc = "Usage: test [--font=<font>...]"
-      temp_config = "/tmp/test_config.yml"
+      temp_config = File.tempname("docopt-config", ".yml")
       File.write(temp_config, {"font" => ["a.ttf", 2]}.to_yaml)
 
       begin
@@ -291,7 +291,7 @@ describe Docopt do
           --verbose=<level>  Verbosity level [default: docopt-default]
         DOC
 
-      temp_config = "/tmp/test_config.yml"
+      temp_config = File.tempname("docopt-config", ".yml")
       File.write(temp_config, {"verbose" => "config-value"}.to_yaml)
       ENV["TEST_VERBOSE"] = "env-value"
 
@@ -403,7 +403,7 @@ describe Docopt do
 
     it "lets a config file enable a repeatable flag not given on the CLI" do
       doc = "Usage: test [-v...]"
-      temp_config = "/tmp/test_config.yml"
+      temp_config = File.tempname("docopt-config", ".yml")
       File.write(temp_config, {"v" => 3}.to_yaml)
 
       begin
@@ -476,7 +476,7 @@ describe Docopt do
 
     it "has_key? agrees with [] for snake_case config keys" do
       doc = "Usage: test [--input-file=<path>]"
-      temp_config = "/tmp/test_config.yml"
+      temp_config = File.tempname("docopt-config", ".yml")
       File.write(temp_config, {"input_file" => "/data/x.csv"}.to_yaml)
 
       begin
@@ -513,7 +513,7 @@ describe Docopt do
 
     it "keeps config file floats as floats" do
       doc = "Usage: test [--ratio=<r>]"
-      temp_config = "/tmp/test_config.yml"
+      temp_config = File.tempname("docopt-config", ".yml")
       File.write(temp_config, {"ratio" => 2.5}.to_yaml)
 
       begin
@@ -527,7 +527,7 @@ describe Docopt do
 
     it "keeps config file integers that overflow Int32 as Int64" do
       doc = "Usage: test [--count=<n>]"
-      temp_config = "/tmp/test_config.yml"
+      temp_config = File.tempname("docopt-config", ".yml")
       File.write(temp_config, {"count" => 9999999999}.to_yaml)
 
       begin
@@ -555,7 +555,7 @@ describe Docopt do
 
     it "falls back gracefully when the config file is not valid YAML" do
       doc = "Usage: test [--verbose=<level>]"
-      temp_config = "/tmp/test_config.yml"
+      temp_config = File.tempname("docopt-config", ".yml")
       File.write(temp_config, "not: [valid: yaml")
 
       begin
@@ -568,7 +568,7 @@ describe Docopt do
 
     it "falls back gracefully when the config file root is not a mapping" do
       doc = "Usage: test [--verbose=<level>]"
-      temp_config = "/tmp/test_config.yml"
+      temp_config = File.tempname("docopt-config", ".yml")
       File.write(temp_config, "- one\n- two\n")
 
       begin
@@ -619,6 +619,42 @@ describe Docopt do
       end
 
       ex.message.should eq("--verbose requires argument")
+    end
+  end
+
+  describe Docopt::ConfigOptions do
+    it "resolves tiers in precedence order" do
+      args = {"--verbose" => "cli"} of String => Docopt::DocoptValue?
+      defaults = {"--verbose" => "default"} of String => Docopt::OptionValue?
+      env = {"--verbose" => "env", "--output" => "out.txt"} of String => String
+      config = config_from_yaml("verbose: config-value\nfont: cfg.ttf\n")
+
+      options = Docopt::ConfigOptions.new(args, defaults, config, env)
+
+      options["--verbose"].should eq("cli")    # CLI beats everything
+      options["--output"].should eq("out.txt") # env when no CLI
+      options["--font"].should eq("cfg.ttf")   # config when no CLI/env
+    end
+
+    it "falls back to docopt defaults when no other tier answers" do
+      args = {"--force" => false} of String => Docopt::DocoptValue?
+      defaults = {"--verbose" => "default"} of String => Docopt::OptionValue?
+
+      options = Docopt::ConfigOptions.new(args, defaults)
+
+      options["--force"].should be_nil # absent flag, no other source
+      options["--verbose"].should eq("default")
+      options.has_key?("--verbose").should be_true
+    end
+
+    it "accepts short option keys in config candidates" do
+      args = {"-v" => 0} of String => Docopt::DocoptValue?
+      config = config_from_yaml("v: 3\n")
+
+      options = Docopt::ConfigOptions.new(args, Hash(String, Docopt::OptionValue?).new, config)
+
+      options["-v"].should eq(3)
+      options.has_key?("-v").should be_true
     end
   end
 end
