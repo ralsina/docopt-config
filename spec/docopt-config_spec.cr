@@ -474,6 +474,43 @@ describe Docopt do
       end
     end
 
+    it "has_key? agrees with [] for snake_case config keys" do
+      doc = "Usage: test [--input-file=<path>]"
+      temp_config = "/tmp/test_config.yml"
+      File.write(temp_config, {"input_file" => "/data/x.csv"}.to_yaml)
+
+      begin
+        options = Docopt.docopt_config(doc, argv: [] of String, config_file_path: temp_config)
+        options["--input-file"].should eq("/data/x.csv")
+        options.has_key?("--input-file").should be_true
+      ensure
+        File.delete(temp_config) if File.exists?(temp_config)
+      end
+    end
+
+    it "has_key? counts docopt defaults as present" do
+      doc = <<-DOC
+        Usage: test [--verbose=<level>]
+
+        Options:
+          --verbose=<level>  Verbosity level [default: docopt-default]
+        DOC
+
+      options = Docopt.docopt_config(doc, argv: [] of String)
+
+      options.has_key?("--verbose").should be_true
+      options["--verbose"].should eq("docopt-default")
+    end
+
+    it "has_key? is false for options no source provides" do
+      doc = "Usage: test [--force]"
+
+      options = Docopt.docopt_config(doc, argv: [] of String)
+
+      options.has_key?("--force").should be_false
+      options["--force"].should be_nil
+    end
+
     it "raises DocoptExit for invalid arguments when exit is false" do
       doc = "Usage: test [--verbose=<level>]"
 

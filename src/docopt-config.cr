@@ -32,16 +32,9 @@ module Docopt
 
       # Check config file third
       if config = @config_file
-        # First try exact key match (for quoted keys like "--verbose" or "-v")
-        return config_value(config[key]) if config.has_key?(key)
-
-        # Then try clean key match (for unquoted keys like "verbose" or "v")
-        clean_key = key.gsub(/^-+/, "")
-        return config_value(config[clean_key]) if config.has_key?(clean_key)
-
-        # Finally try snake_case key (for "input_file" matching "--input-file")
-        snake_key = clean_key.gsub(/-/, "_")
-        return config_value(config[snake_key]) if config.has_key?(snake_key)
+        config_candidates(key).each do |candidate|
+          return config_value(config[candidate]) if config.has_key?(candidate)
+        end
       end
 
       # Finally return docopt default
@@ -57,11 +50,23 @@ module Docopt
       self[key]
     end
 
+    # Whether the key resolves to a value from any tier, consistent with []:
+    # CLI, env vars, config file (with key fallbacks) and docopt defaults.
     def has_key?(key : String) : Bool
       return true if provided_by_cli?(key)
       return true if @env_vars.has_key?(long_key(key))
-      config = @config_file
-      !config.nil? && config.has_key?(key)
+      if config = @config_file
+        return true if config_candidates(key).any? { |candidate| config.has_key?(candidate) }
+      end
+      @docopt_defaults.has_key?(key)
+    end
+
+    # Candidate config-file keys for an option key, most specific first:
+    # the exact key ("--input-file"), the clean key ("input-file"), and the
+    # snake_case key ("input_file"). Short options ("-v") clean to "v".
+    private def config_candidates(key : String) : Array(String)
+      clean_key = key.gsub(/^-+/, "")
+      [key, clean_key, clean_key.gsub(/-/, "_")].uniq
     end
 
     # Normalize an option key to long form ("-v" becomes "--v"), which is
