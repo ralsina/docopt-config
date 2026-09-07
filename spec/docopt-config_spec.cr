@@ -383,6 +383,24 @@ describe Docopt do
       options["--help"].should be_true
     end
 
+    it "allows env vars to override non-lowercase [default: ...] annotations" do
+      doc = <<-DOC
+        Usage: test [--verbose=<level>]
+
+        Options:
+          --verbose=<level>  Verbosity level [DEFAULT: docopt-default]
+        DOC
+
+      ENV["TEST_VERBOSE"] = "env-value"
+
+      begin
+        options = Docopt.docopt_config(doc, argv: [] of String, env_prefix: "TEST")
+        options["--verbose"].should eq("env-value")
+      ensure
+        ENV.delete("TEST_VERBOSE")
+      end
+    end
+
     it "raises DocoptExit for invalid arguments when exit is false" do
       doc = "Usage: test [--verbose=<level>]"
 

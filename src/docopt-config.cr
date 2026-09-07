@@ -207,9 +207,10 @@ module Docopt
     end
   end
 
-  # Remove default specifications from docopt string
+  # Remove default specifications from docopt string. Case-insensitive to
+  # match docopt's own [default: ...] parsing.
   private def self.remove_docopt_defaults(doc : String) : String
-    doc.gsub(/\s*\[default:\s*([^\]]+)\]/, "")
+    doc.gsub(/\s*\[default:\s*([^\]]+)\]/i, "")
   end
 
   # Extract default values using docopt's built-in parse_defaults functionality
