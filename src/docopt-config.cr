@@ -148,16 +148,17 @@ module Docopt
   end
 
   # Collect the environment variables relevant to options, converted to
-  # option format. With a prefix, only variables starting with
-  # "#{env_prefix}_" are used (prefix stripped); without one, all are.
+  # option format. A nil prefix (legacy default) maps every environment
+  # variable; an empty prefix means "no environment variables at all";
+  # any other prefix maps only variables starting with "#{env_prefix}_"
+  # (prefix stripped).
   private def self.collect_env_vars(env_prefix : String?) : Hash(String, String)
     env_vars = Hash(String, String).new
     ENV.each do |key, value|
-      if env_prefix
-        next unless key.starts_with?(env_prefix + "_")
-        env_vars[env_to_key(key[env_prefix.size + 1..-1])] = value
-      else
+      if env_prefix.nil?
         env_vars[env_to_key(key)] = value
+      elsif !env_prefix.empty? && key.starts_with?(env_prefix + "_")
+        env_vars[env_to_key(key[env_prefix.size + 1..-1])] = value
       end
     end
     env_vars

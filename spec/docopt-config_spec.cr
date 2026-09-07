@@ -579,6 +579,30 @@ describe Docopt do
       end
     end
 
+    it "treats an empty env prefix as no environment variables" do
+      doc = "Usage: test [--verbose=<level>]"
+      ENV["TEST_VERBOSE"] = "5"
+
+      begin
+        options = Docopt.docopt_config(doc, argv: [] of String, env_prefix: "")
+        options["--verbose"].should be_nil
+      ensure
+        ENV.delete("TEST_VERBOSE")
+      end
+    end
+
+    it "with a nil env prefix maps every environment variable" do
+      doc = "Usage: test [--test-verbose=<level>]"
+      ENV["TEST_VERBOSE"] = "5"
+
+      begin
+        options = Docopt.docopt_config(doc, argv: [] of String)
+        options["--test-verbose"].should eq("5")
+      ensure
+        ENV.delete("TEST_VERBOSE")
+      end
+    end
+
     it "raises DocoptExit for invalid arguments when exit is false" do
       doc = "Usage: test [--verbose=<level>]"
 

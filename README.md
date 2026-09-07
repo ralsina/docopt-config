@@ -128,10 +128,11 @@ The library follows this precedence order (highest to lowest):
 # Custom config file path
 options = Docopt.docopt_config(doc, config_file_path: "/etc/myapp/config.yml")
 
-# No environment variable prefix (uses all env vars)
+# No prefix: every environment variable is mapped (legacy default).
+# Prefer a prefix to avoid collisions with unrelated variables.
 options = Docopt.docopt_config(doc, env_prefix: nil)
 
-# Only use command-line and config file (no env vars)
+# Empty prefix: do not use environment variables at all
 options = Docopt.docopt_config(doc, config_file_path: "config.yml", env_prefix: "")
 
 # Pass custom argv for testing
