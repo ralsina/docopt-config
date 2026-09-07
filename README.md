@@ -139,6 +139,8 @@ options = Docopt.docopt_config(doc, argv: ["--verbose", "5"])
 # and write help/version output to a custom IO. With exit: false,
 # help/version requests raise Docopt::ConfigExit, invalid usage raises
 # Docopt::DocoptExit, and other errors propagate untouched.
+# In the default exit mode, usage errors print the error message and
+# usage summary to standard error and exit with status 1.
 io = IO::Memory.new
 options = Docopt.docopt_config(doc, argv: ["--help"], exit: false, io: io)
 ```

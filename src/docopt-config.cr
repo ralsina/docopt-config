@@ -190,16 +190,18 @@ module Docopt
 
       ConfigOptions.new(args, docopt_defaults, config_file, env_vars)
     rescue ex : DocoptExit
-      # Show help with original docopt (complete with defaults)
+      # Usage error: docopt convention is an optional message plus the usage
+      # summary on stderr, and a non-zero exit status.
       if exit
-        io.puts original_doc
-        Process.exit(0)
+        STDERR.puts ex.message if ex.message && !ex.message.empty?
+        STDERR.puts DocoptExit.usage unless DocoptExit.usage.empty?
+        Process.exit(1)
       end
       raise ex
     rescue ex
       # Handle other exceptions
       if exit
-        puts "Error: #{ex.message}"
+        STDERR.puts "Error: #{ex.message}"
         Process.exit(1)
       end
       raise ex

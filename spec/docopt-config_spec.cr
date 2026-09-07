@@ -358,5 +358,15 @@ describe Docopt do
         Docopt.docopt_config(doc, argv: ["--verbose"], exit: false)
       end
     end
+
+    it "propagates the usage error message when exit is false" do
+      doc = "Usage: test [--verbose=<level>]"
+
+      ex = expect_raises(Docopt::DocoptExit) do
+        Docopt.docopt_config(doc, argv: ["--verbose"], exit: false)
+      end
+
+      ex.message.should eq("--verbose requires argument")
+    end
   end
 end
