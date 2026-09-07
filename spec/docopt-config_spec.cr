@@ -553,6 +553,32 @@ describe Docopt do
       options["--ratio"].should be_a(Float64)
     end
 
+    it "falls back gracefully when the config file is not valid YAML" do
+      doc = "Usage: test [--verbose=<level>]"
+      temp_config = "/tmp/test_config.yml"
+      File.write(temp_config, "not: [valid: yaml")
+
+      begin
+        options = Docopt.docopt_config(doc, argv: [] of String, config_file_path: temp_config)
+        options["--verbose"].should be_nil
+      ensure
+        File.delete(temp_config) if File.exists?(temp_config)
+      end
+    end
+
+    it "falls back gracefully when the config file root is not a mapping" do
+      doc = "Usage: test [--verbose=<level>]"
+      temp_config = "/tmp/test_config.yml"
+      File.write(temp_config, "- one\n- two\n")
+
+      begin
+        options = Docopt.docopt_config(doc, argv: [] of String, config_file_path: temp_config)
+        options["--verbose"].should be_nil
+      ensure
+        File.delete(temp_config) if File.exists?(temp_config)
+      end
+    end
+
     it "raises DocoptExit for invalid arguments when exit is false" do
       doc = "Usage: test [--verbose=<level>]"
 

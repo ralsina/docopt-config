@@ -223,8 +223,10 @@ module Docopt
             stringified_config[key.as_s] = value
           end
           config_file = stringified_config
-        rescue
-          # If config file parsing fails, continue without it
+        rescue ex
+          # A config file that can't be parsed is very likely a mistake;
+          # say so instead of silently running without it.
+          STDERR.puts "docopt-config: warning: ignoring config file #{config_file_path}: #{ex.message}"
           config_file = nil
         end
       end
