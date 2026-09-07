@@ -19,4 +19,4 @@ jobs:
       - name: Run specs
         run: crystal spec
       - name: Lint
-        run: ./bin/ameba
+        run: ./lib/ameba/bin/ameba
