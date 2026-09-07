@@ -2,6 +2,9 @@ require "docopt"
 require "yaml"
 
 module Docopt
+  # The value type Docopt.docopt itself returns in its hash.
+  alias DocoptValue = String | Int32 | Bool | Array(String)
+
   # The type of a docopt option value: what Docopt.docopt returns in its
   # hash, plus Int64/Float64 which config files and defaults can supply for
   # values docopt itself would only carry as strings.
@@ -16,7 +19,7 @@ module Docopt
   class ConfigOptions
     # Values as docopt itself produces them; only defaults and config/env
     # sources can widen to Int64/Float64 (see OptionValue).
-    property args : Hash(String, (Nil | String | Int32 | Bool | Array(String)))
+    property args : Hash(String, DocoptValue?)
     property docopt_defaults : Hash(String, OptionValue?)
     property config_file : Hash(String, YAML::Any)?
     property env_vars : Hash(String, String)
@@ -264,17 +267,15 @@ module Docopt
     option_objects = Docopt.parse_defaults(doc)
 
     option_objects.each do |option|
-      if option.responds_to?(:long) && option.responds_to?(:value) && option.responds_to?(:argcount)
-        long_name = option.long
-        default_value = option.value
-        argcount = option.argcount
+      long_name = option.long
+      default_value = option.value
+      argcount = option.argcount
 
-        # Only include options that have arguments (argcount > 0) and have default values
-        if long_name && argcount > 0 && default_value
-          # Convert the default value to the appropriate type
-          parsed_value = parse_default_value(default_value.to_s)
-          defaults[long_name.to_s] = parsed_value if parsed_value
-        end
+      # Only include options that have arguments (argcount > 0) and have default values
+      if long_name && argcount > 0 && default_value
+        # Convert the default value to the appropriate type
+        parsed_value = parse_default_value(default_value.to_s)
+        defaults[long_name.to_s] = parsed_value if parsed_value
       end
     end
 
