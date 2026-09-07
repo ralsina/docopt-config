@@ -134,6 +134,13 @@ options = Docopt.docopt_config(doc, config_file_path: "config.yml", env_prefix: 
 
 # Pass custom argv for testing
 options = Docopt.docopt_config(doc, argv: ["--verbose", "5"])
+
+# Library mode: raise exceptions instead of terminating the process,
+# and write help/version output to a custom IO. With exit: false,
+# help/version requests raise Docopt::ConfigExit, invalid usage raises
+# Docopt::DocoptExit, and other errors propagate untouched.
+io = IO::Memory.new
+options = Docopt.docopt_config(doc, argv: ["--help"], exit: false, io: io)
 ```
 
 ## Development

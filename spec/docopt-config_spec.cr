@@ -317,5 +317,46 @@ describe Docopt do
         ENV.delete("TEST_VERBOSE")
       end
     end
+
+    it "raises ConfigExit for help requests when exit is false" do
+      doc = "Usage: test [--verbose=<level>]"
+      io = IO::Memory.new
+
+      expect_raises(Docopt::ConfigExit) do
+        Docopt.docopt_config(doc, argv: ["--help"], exit: false, io: io)
+      end
+
+      io.to_s.should contain("Usage: test")
+    end
+
+    it "raises ConfigExit for version requests when exit is false" do
+      doc = "Usage: test [--verbose=<level>]"
+      io = IO::Memory.new
+
+      expect_raises(Docopt::ConfigExit) do
+        Docopt.docopt_config(doc, argv: ["--version"], version: "1.2.3", exit: false, io: io)
+      end
+
+      io.to_s.should eq("1.2.3\n")
+    end
+
+    it "treats --help as a usage error when help is false" do
+      doc = "Usage: test [--verbose=<level>]"
+      io = IO::Memory.new
+
+      expect_raises(Docopt::DocoptExit) do
+        Docopt.docopt_config(doc, argv: ["--help"], help: false, exit: false, io: io)
+      end
+
+      io.to_s.should be_empty
+    end
+
+    it "raises DocoptExit for invalid arguments when exit is false" do
+      doc = "Usage: test [--verbose=<level>]"
+
+      expect_raises(Docopt::DocoptExit) do
+        Docopt.docopt_config(doc, argv: ["--verbose"], exit: false)
+      end
+    end
   end
 end

@@ -5,6 +5,12 @@ module Docopt
   # The type of a docopt option value: what Docopt.docopt returns in its hash.
   alias OptionValue = String | Int32 | Bool | Array(String)
 
+  # Raised instead of exiting when docopt_config is called with exit: false
+  # and the process would have terminated normally (help or version request).
+  # Note: this class deliberately has no custom initialize — adding one breaks
+  # Docopt's internal exception-class dispatch.
+  class ConfigExit < DocoptException; end
+
   class ConfigOptions
     property args : Hash(String, OptionValue?)
     property docopt_defaults : Hash(String, OptionValue?)
@@ -111,6 +117,23 @@ module Docopt
     env_vars
   end
 
+  # Handle --help / --version before any parsing happens. Exits (or raises
+  # ConfigExit when exit is false) after writing to io.
+  private def self.check_help_and_version(doc : String, argv : Array(String), help : Bool,
+                                          version : String?, exit : Bool, io : IO) : Nil
+    if help && (argv.includes?("--help") || argv.includes?("-h"))
+      io.puts doc
+      Process.exit(0) if exit
+      raise ConfigExit.new("help requested")
+    end
+
+    if version && argv.includes?("--version")
+      io.puts version
+      Process.exit(0) if exit
+      raise ConfigExit.new("version requested")
+    end
+  end
+
   # Main function to parse docopt with config file and environment variable support
   def self.docopt_config(doc : String,
                          argv : Array(String) = ARGV,
@@ -118,20 +141,14 @@ module Docopt
                          env_prefix : String? = nil,
                          help : Bool = true,
                          version : String? = nil,
-                         options_first : Bool = false) : ConfigOptions
+                         options_first : Bool = false,
+                         exit : Bool = true,
+                         io : IO = STDOUT) : ConfigOptions
     # Store original docopt for help display
     original_doc = doc
 
     # Early detection for help and version requests
-    if help && (argv.includes?("--help") || argv.includes?("-h"))
-      puts original_doc
-      Process.exit(0)
-    end
-
-    if version && argv.includes?("--version")
-      puts version
-      Process.exit(0)
-    end
+    check_help_and_version(original_doc, argv, help, version, exit, io)
 
     # Create a modified docopt string without defaults for parsing
     doc_without_defaults = remove_docopt_defaults(doc)
@@ -172,14 +189,20 @@ module Docopt
       env_vars = collect_env_vars(env_prefix)
 
       ConfigOptions.new(args, docopt_defaults, config_file, env_vars)
-    rescue DocoptExit
+    rescue ex : DocoptExit
       # Show help with original docopt (complete with defaults)
-      puts original_doc
-      Process.exit(0)
+      if exit
+        io.puts original_doc
+        Process.exit(0)
+      end
+      raise ex
     rescue ex
       # Handle other exceptions
-      puts "Error: #{ex.message}"
-      Process.exit(1)
+      if exit
+        puts "Error: #{ex.message}"
+        Process.exit(1)
+      end
+      raise ex
     end
   end
 
